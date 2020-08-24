@@ -2,12 +2,16 @@ package blockchain
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/dgraph-io/badger"
+	//"github.com/dgraph-io/badger"
 )
 
 const (
 	dbPath = "./tmp/blocks"
+	dbFile = "./tmp/blocks/MANIFEST"
 )
 
 type BlockChain struct {
@@ -21,9 +25,20 @@ type BlockChainIterator struct {
 	Database    *badger.DB
 }
 
+func DBexists() bool {
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 func InitBlockChain() *BlockChain {
 
 	//return &BlockChain{[]*Block{Genesis()}}
+
+	if DBexists() {
+		fmt.Println("Blockchain ya existe")
+	}
 
 	var lastHash []byte
 
@@ -32,6 +47,7 @@ func InitBlockChain() *BlockChain {
 	opts.ValueDir = dbPath
 
 	db, err := badger.Open(opts)
+
 	Handle(err)
 
 	err = db.Update(func(txn *badger.Txn) error {
@@ -57,6 +73,7 @@ func InitBlockChain() *BlockChain {
 	Handle(err)
 
 	blockchain := BlockChain{lastHash, db}
+	//defer db.Close()
 	return &blockchain
 
 }
@@ -113,4 +130,28 @@ func (iter *BlockChainIterator) Next() *Block {
 	iter.CurrentHash = block.PrevHash
 
 	return block
+}
+
+func PrintChain(chain *BlockChain) {
+	iter := chain.Iterator()
+
+	for {
+		block := iter.Next()
+
+		fmt.Printf("Prev. Hash: %x\n", block.PrevHash)
+		fmt.Printf("Data: %s\n", block.Data)
+		fmt.Printf("Hash: %x\n", block.Hash)
+		pow := NewProof(block)
+		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
+		fmt.Println()
+
+		if len(block.PrevHash) == 0 {
+			break
+		}
+	}
+}
+
+func closeFile(f *os.File) {
+	fmt.Println("cerrar")
+	f.Close()
 }
